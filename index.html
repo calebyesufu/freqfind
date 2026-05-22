@@ -701,11 +701,35 @@
 <script>
 // ─── Config ───────────────────────────────────────────────────────────────────
 const API = (() => {
-  if (window.FREQFIND_API) return window.FREQFIND_API;
   const h = location.hostname;
   if (h === 'localhost' || h === '127.0.0.1') return 'http://localhost:8000';
+  if (window.FREQFIND_API) return String(window.FREQFIND_API).replace(/\/$/, '');
+  // Vercel: /api is proxied to Render in vercel.json
+  if (h.includes('vercel.app') || h.endsWith('.vercel.app')) return '/api';
   return 'https://freqfind-api.onrender.com';
 })();
+
+async function parseApiError(res) {
+  const text = await res.text();
+  try {
+    const j = JSON.parse(text);
+    if (j.detail) {
+      const d = j.detail;
+      return typeof d === 'string' ? d : JSON.stringify(d);
+    }
+  } catch (_) { /* not JSON */ }
+  if (/<!DOCTYPE|<html/i.test(text)) {
+    return 'Backend not running. Deploy freqfind-api on Render (see DEPLOY.md) or run: python -m uvicorn main:app --port 8000';
+  }
+  return text.trim() || `Request failed (${res.status})`;
+}
+
+async function apiFetch(path, options = {}) {
+  const url = `${API}${path}`;
+  const res = await fetch(url, options);
+  if (!res.ok) throw new Error(await parseApiError(res));
+  return res.json();
+}
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let state = {
@@ -726,6 +750,8 @@ let state = {
   songs: [],
   stats: { total_songs: 0, total_hashes: 0 },
   libLoading: false,
+  backendError: null,
+  backendOk: null,
 };
 
 function setState(patch) {
@@ -737,9 +763,7 @@ function setState(patch) {
 async function apiIdentify(file) {
   const fd = new FormData();
   fd.append('file', file);
-  const res = await fetch(`${API}/identify`, { method: 'POST', body: fd });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  return apiFetch('/identify', { method: 'POST', body: fd });
 }
 
 async function apiIndex(file, title, artist) {
@@ -747,24 +771,35 @@ async function apiIndex(file, title, artist) {
   fd.append('file', file);
   fd.append('title', title);
   fd.append('artist', artist);
-  const res = await fetch(`${API}/songs/add`, { method: 'POST', body: fd });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+  return apiFetch('/songs/add', { method: 'POST', body: fd });
 }
 
 async function apiSongs() {
-  const res = await fetch(`${API}/songs`);
-  return res.json();
+  return apiFetch('/songs');
 }
 
 async function apiStats() {
-  const res = await fetch(`${API}/stats`);
-  return res.json();
+  return apiFetch('/stats');
 }
 
 async function apiDelete(id) {
-  const res = await fetch(`${API}/songs/${id}`, { method: 'DELETE' });
-  return res.json();
+  return apiFetch(`/songs/${id}`, { method: 'DELETE' });
+}
+
+async function checkBackend() {
+  try {
+    const h = await apiFetch('/health');
+    setState({ backendOk: true, backendError: null });
+    return h;
+  } catch (e) {
+    setState({
+      backendOk: false,
+      backendError: e.message === 'Not Found'
+        ? 'API not found — deploy the backend on Render (freqfind-api) and redeploy Vercel. See DEPLOY.md.'
+        : e.message,
+    });
+    return null;
+  }
 }
 
 // ─── Actions ──────────────────────────────────────────────────────────────────
@@ -793,10 +828,11 @@ async function doIndex() {
 async function loadLibrary() {
   setState({ libLoading: true });
   try {
+    await checkBackend();
     const [s, stats] = await Promise.all([apiSongs(), apiStats()]);
-    setState({ songs: s.songs, stats, libLoading: false });
-  } catch {
-    setState({ libLoading: false });
+    setState({ songs: s.songs || [], stats, libLoading: false, backendError: null, backendOk: true });
+  } catch (e) {
+    setState({ libLoading: false, backendError: e.message, backendOk: false, songs: [] });
   }
 }
 
@@ -1128,6 +1164,7 @@ function render() {
         <div class="tagline">// Shazam reimagined · Fourier Transform music identification</div>
       </header>
       <div class="tabs">${tabsHTML}</div>
+      ${state.backendError ? `<div class="error-box" style="margin-bottom:20px">⚠️ <strong>Backend:</strong> ${state.backendError}</div>` : ''}
       ${content}
     </div>`;
 }

@@ -91,9 +91,24 @@ Local dev still uses `http://localhost:8000` automatically.
 
 ## Troubleshooting
 
+### "Not Found" or "detail not found" in the app
+
+This means the **Render backend is not running** or the URL is wrong.
+
+1. Open https://dashboard.render.com — you must see a service named **freqfind-api** (green / live).
+2. If missing, deploy the blueprint: https://dashboard.render.com/blueprint/new?repo=https://github.com/calebyesufu/freqfind
+3. Copy your real Render URL (e.g. `https://freqfind-api.onrender.com`) from the Render dashboard.
+4. In **Vercel** → Project → Settings → Environment Variables, set:
+   - `RENDER_API_URL` = your Render URL (no trailing slash)
+5. **Redeploy** Vercel (Deployments → … → Redeploy).
+
+Test the API directly in a browser: `https://freqfind-api.onrender.com/health` should show `{"status":"ok","service":"FreqFind"}`.
+
+### Other issues
+
 | Issue | Fix |
 |-------|-----|
-| Vercel shows app but API errors | Check `RENDER_API_URL` in Vercel; redeploy |
+| Vercel shows app but API errors | Set `RENDER_API_URL`; redeploy Vercel |
 | Render build fails on Python 3.13 | `render.yaml` pins Python 3.11 |
-| Empty library on Render | Check logs for `Seeding demo songs`; ensure `sample_songs/` is in the repo |
-| CORS errors | Backend allows `*`; ensure frontend uses HTTPS API URL on Vercel |
+| Empty library on Render | Check Render logs for `Seeding demo songs` |
+| First request very slow | Render free tier cold start (~30s) — wait and retry |

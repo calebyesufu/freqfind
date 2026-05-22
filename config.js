@@ -1,2 +1,3 @@
-// Overwritten at Vercel build time; default matches Render service name in render.yaml
-window.FREQFIND_API = 'https://freqfind-api.onrender.com';
+// Generated at build
+window.FREQFIND_API = '/api';
+window.FREQFIND_RENDER_URL = 'https://freqfind-api.onrender.com';

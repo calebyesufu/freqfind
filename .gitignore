@@ -18,3 +18,5 @@ files.zip
 .vscode/
 .DS_Store
 Thumbs.db
+
+.vercel

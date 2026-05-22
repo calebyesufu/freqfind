@@ -5,15 +5,13 @@
   "outputDirectory": ".",
   "installCommand": "",
   "rewrites": [
-    { "source": "/config.js", "destination": "/config.js" },
-    { "source": "/(.*)", "destination": "/index.html" }
-  ],
-  "headers": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://freqfind-api.onrender.com/:path*"
+    },
     {
       "source": "/(.*)",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" }
-      ]
+      "destination": "/index.html"
     }
   ]
 }

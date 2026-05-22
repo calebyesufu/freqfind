@@ -207,8 +207,21 @@ cd frontend && python -m http.server 3000
 
 ---
 
+## Live deployment
+
+| Platform | Role | Setup |
+|----------|------|--------|
+| [GitHub](https://github.com/calebyesufu/freqfind) | Source | Already published |
+| [Render](https://dashboard.render.com/blueprint/new?repo=https://github.com/calebyesufu/freqfind) | API backend | Import blueprint (`render.yaml`) |
+| [Vercel](https://vercel.com/new/clone?repository-url=https://github.com/calebyesufu/freqfind) | Frontend | Import repo; set `RENDER_API_URL` |
+
+Full steps: see **[DEPLOY.md](./DEPLOY.md)**.
+
+---
+
 ## Future Improvements
 
+- [x] Docker container + Render deployment
 - [ ] Real-time microphone identification (Web Audio API)
 - [ ] Noise robustness testing (add Gaussian noise to queries)
 - [ ] GPU-accelerated FFT with CuPy

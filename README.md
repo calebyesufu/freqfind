@@ -132,7 +132,7 @@ freqfind/
 ### 1. Clone & Install
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/freqfind.git
+git clone https://github.com/calebyesufu/freqfind.git
 cd freqfind
 pip install -r requirements.txt
 ```

@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>FreqFind — FFT Music Identification</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #08080f;
+    --surface:   #0f0f1c;
+    --surface2:  #15152a;
+    --border:    #1f1f3a;
+    --accent:    #7c3aed;
+    --accent2:   #a855f7;
+    --teal:      #00f5c4;
+    --text:      #e2e2f0;
+    --muted:     #6b6b99;
+    --danger:    #ff4b6e;
+    --success:   #00f5c4;
+    --mono:      'Space Mono', monospace;
+    --display:   'Syne', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--display);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Background grid ── */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(124,58,237,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(124,58,237,0.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  body::after {
+    content: '';
+    position: fixed;
+    top: -300px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 800px;
+    height: 600px;
+    background: radial-gradient(ellipse at center, rgba(124,58,237,0.12) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  #root { position: relative; z-index: 1; }
+
+  /* ── Layout ── */
+  .app { max-width: 960px; margin: 0 auto; padding: 0 24px 80px; }
+
+  /* ── Header ── */
+  header {
+    padding: 48px 0 32px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+  }
+
+  .logo {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 8px;
+  }
+
+  .logo-mark {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--teal);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border: 1px solid var(--teal);
+    opacity: 0.8;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    font-weight: 800;
+    letter-spacing: -1px;
+    line-height: 1;
+    background: linear-gradient(135deg, #fff 0%, var(--accent2) 60%, var(--teal) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .tagline {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 8px;
+    letter-spacing: 1px;
+  }
+
+  /* ── Tabs ── */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 4px;
+    margin-bottom: 32px;
+  }
+
+  .tab {
+    flex: 1;
+    padding: 10px 16px;
+    background: none;
+    border: none;
+    border-radius: 7px;
+    color: var(--muted);
+    font-family: var(--display);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+  }
+
+  .tab.active {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 2px 12px rgba(124,58,237,0.4);
+  }
+
+  .tab:not(.active):hover { color: var(--text); background: var(--surface2); }
+
+  /* ── Cards ── */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px;
+    margin-bottom: 20px;
+    transition: border-color 0.2s;
+  }
+
+  .card:hover { border-color: rgba(124,58,237,0.3); }
+
+  .card-title {
+    font-size: 11px;
+    font-family: var(--mono);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--muted);
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .card-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  /* ── Drop Zone ── */
+  .dropzone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 48px 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.25s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .dropzone::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse at center, rgba(124,58,237,0.05) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.25s;
+  }
+
+  .dropzone:hover, .dropzone.dragging {
+    border-color: var(--accent);
+    background: rgba(124,58,237,0.04);
+  }
+
+  .dropzone:hover::before, .dropzone.dragging::before { opacity: 1; }
+
+  .drop-icon {
+    width: 52px;
+    height: 52px;
+    margin: 0 auto 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+  }
+
+  .drop-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .drop-sub {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .file-selected {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    background: var(--surface2);
+    border: 1px solid rgba(0,245,196,0.2);
+    border-radius: 8px;
+    margin-top: 16px;
+  }
+
+  .file-icon { font-size: 20px; }
+
+  .file-info { flex: 1; text-align: left; }
+  .file-name { font-size: 13px; font-weight: 600; }
+  .file-size { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+
+  .file-remove {
+    background: none;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 18px;
+    padding: 4px;
+    transition: color 0.15s;
+  }
+
+  .file-remove:hover { color: var(--danger); }
+
+  /* ── Inputs ── */
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-top: 16px;
+  }
+
+  .input-group { display: flex; flex-direction: column; gap: 6px; }
+
+  label {
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+  }
+
+  input[type="text"] {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: var(--display);
+    font-size: 14px;
+    padding: 10px 14px;
+    outline: none;
+    transition: border-color 0.2s;
+    width: 100%;
+  }
+
+  input[type="text"]:focus { border-color: var(--accent); }
+
+  /* ── Button ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 28px;
+    border: none;
+    border-radius: 10px;
+    font-family: var(--display);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.3px;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff;
+    box-shadow: 0 4px 20px rgba(124,58,237,0.35);
+    width: 100%;
+    margin-top: 16px;
+    padding: 14px;
+    font-size: 15px;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 28px rgba(124,58,237,0.5);
+  }
+
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .btn-sm {
+    padding: 7px 14px;
+    font-size: 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 7px;
+  }
+
+  .btn-sm:hover { border-color: var(--accent); color: var(--accent2); }
+
+  /* ── Loading ── */
+  .loading-bar {
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 16px;
+  }
+
+  .loading-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--teal));
+    animation: progress 1.4s ease-in-out infinite;
+    transform-origin: left;
+  }
+
+  @keyframes progress {
+    0%   { transform: scaleX(0) translateX(0); }
+    50%  { transform: scaleX(0.6) translateX(50%); }
+    100% { transform: scaleX(0) translateX(300%); }
+  }
+
+  .spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Waveform ── */
+  .waveform-container {
+    height: 80px;
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    overflow: hidden;
+    margin-top: 8px;
+  }
+
+  .waveform-bar {
+    flex: 1;
+    background: linear-gradient(180deg, var(--accent2) 0%, var(--teal) 100%);
+    border-radius: 1px;
+    min-height: 2px;
+    animation: barPulse 1.5s ease-in-out infinite alternate;
+    opacity: 0.8;
+  }
+
+  @keyframes barPulse { from { opacity: 0.4; } to { opacity: 0.9; } }
+
+  /* ── Results ── */
+  .result-hero {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 24px;
+    background: linear-gradient(135deg, rgba(124,58,237,0.1) 0%, rgba(0,245,196,0.05) 100%);
+    border: 1px solid rgba(0,245,196,0.2);
+    border-radius: 12px;
+    margin-bottom: 20px;
+    animation: fadeUp 0.4s ease;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .result-icon {
+    font-size: 40px;
+    flex-shrink: 0;
+  }
+
+  .result-title {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    line-height: 1.1;
+  }
+
+  .result-artist {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--teal);
+    margin-top: 4px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .confidence-badge {
+    margin-left: auto;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .confidence-num {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--teal);
+    line-height: 1;
+  }
+
+  .confidence-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  /* ── Match list ── */
+  .match-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--border);
+    animation: fadeUp 0.3s ease;
+  }
+
+  .match-item:last-child { border-bottom: none; }
+
+  .match-rank {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+  }
+
+  .match-info { flex: 1 }
+
+  .match-name { font-size: 14px; font-weight: 700; }
+  .match-meta { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  .match-bar-wrap {
+    flex: 1;
+    max-width: 140px;
+  }
+
+  .match-bar-bg {
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .match-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: linear-gradient(90deg, var(--accent), var(--teal));
+    transition: width 0.6s ease;
+  }
+
+  .match-score {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--teal);
+    width: 48px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  /* ── Visualizations ── */
+  .viz-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  @media (max-width: 620px) { .viz-grid { grid-template-columns: 1fr; } .form-row { grid-template-columns: 1fr; } }
+
+  .viz-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .viz-label {
+    padding: 10px 14px;
+    font-family: var(--mono);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+
+  .viz-panel img {
+    width: 100%;
+    display: block;
+  }
+
+  /* ── Stats chips ── */
+  .stats-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+
+  .stat-chip {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 16px;
+    text-align: center;
+    flex: 1;
+    min-width: 80px;
+  }
+
+  .stat-num {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--accent2);
+    font-family: var(--mono);
+  }
+
+  .stat-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 2px;
+  }
+
+  /* ── Songs table ── */
+  .song-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .song-row:last-child { border-bottom: none; }
+
+  .song-num {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    width: 22px;
+    text-align: center;
+  }
+
+  .song-info { flex: 1 }
+  .song-title { font-size: 14px; font-weight: 600; }
+  .song-meta  { font-family: var(--mono); font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  .song-hashes {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    padding: 3px 8px;
+    background: var(--surface2);
+    border-radius: 4px;
+  }
+
+  .btn-danger {
+    background: none;
+    border: 1px solid transparent;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    transition: all 0.15s;
+  }
+
+  .btn-danger:hover { border-color: var(--danger); color: var(--danger); }
+
+  /* ── Learn section ── */
+  .learn-section { margin-top: 8px; }
+
+  .learn-block {
+    background: var(--surface2);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 10px 10px 0;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+  }
+
+  .learn-block h3 {
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--accent2);
+  }
+
+  .learn-block p {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+
+  .math-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-top: 10px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--teal);
+    line-height: 1.9;
+    letter-spacing: 0.5px;
+    overflow-x: auto;
+  }
+
+  .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: var(--mono);
+    font-size: 11px;
+    background: rgba(124,58,237,0.15);
+    color: var(--accent2);
+    border: 1px solid rgba(124,58,237,0.2);
+  }
+
+  /* ── Error ── */
+  .error-box {
+    background: rgba(255,75,110,0.08);
+    border: 1px solid rgba(255,75,110,0.3);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--danger);
+    margin-top: 12px;
+  }
+
+  /* ── Empty state ── */
+  .empty {
+    text-align: center;
+    padding: 40px 0;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 12px;
+  }
+
+  .empty-icon { font-size: 36px; margin-bottom: 10px; }
+
+  /* ── No-match ── */
+  .no-match {
+    text-align: center;
+    padding: 32px;
+    color: var(--muted);
+  }
+
+  .no-match-icon { font-size: 48px; margin-bottom: 12px; }
+  .no-match p { font-size: 13px; font-family: var(--mono); }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+// ─── Config ───────────────────────────────────────────────────────────────────
+const API = 'http://localhost:8000';
+
+// ─── State ────────────────────────────────────────────────────────────────────
+let state = {
+  tab: 'identify',         // 'identify' | 'index' | 'library' | 'learn'
+  // Identify
+  idFile: null,
+  idLoading: false,
+  idResult: null,
+  idError: null,
+  // Index
+  indexFile: null,
+  indexTitle: '',
+  indexArtist: '',
+  indexLoading: false,
+  indexResult: null,
+  indexError: null,
+  // Library
+  songs: [],
+  stats: { total_songs: 0, total_hashes: 0 },
+  libLoading: false,
+};
+
+function setState(patch) {
+  Object.assign(state, patch);
+  render();
+}
+
+// ─── API helpers ──────────────────────────────────────────────────────────────
+async function apiIdentify(file) {
+  const fd = new FormData();
+  fd.append('file', file);
+  const res = await fetch(`${API}/identify`, { method: 'POST', body: fd });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function apiIndex(file, title, artist) {
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('title', title);
+  fd.append('artist', artist);
+  const res = await fetch(`${API}/songs/add`, { method: 'POST', body: fd });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+async function apiSongs() {
+  const res = await fetch(`${API}/songs`);
+  return res.json();
+}
+
+async function apiStats() {
+  const res = await fetch(`${API}/stats`);
+  return res.json();
+}
+
+async function apiDelete(id) {
+  const res = await fetch(`${API}/songs/${id}`, { method: 'DELETE' });
+  return res.json();
+}
+
+// ─── Actions ──────────────────────────────────────────────────────────────────
+async function doIdentify() {
+  if (!state.idFile) return;
+  setState({ idLoading: true, idResult: null, idError: null });
+  try {
+    const result = await apiIdentify(state.idFile);
+    setState({ idResult: result, idLoading: false });
+  } catch (e) {
+    setState({ idError: e.message, idLoading: false });
+  }
+}
+
+async function doIndex() {
+  if (!state.indexFile || !state.indexTitle) return;
+  setState({ indexLoading: true, indexResult: null, indexError: null });
+  try {
+    const result = await apiIndex(state.indexFile, state.indexTitle, state.indexArtist || 'Unknown Artist');
+    setState({ indexResult: result, indexLoading: false });
+  } catch (e) {
+    setState({ indexError: e.message, indexLoading: false });
+  }
+}
+
+async function loadLibrary() {
+  setState({ libLoading: true });
+  try {
+    const [s, stats] = await Promise.all([apiSongs(), apiStats()]);
+    setState({ songs: s.songs, stats, libLoading: false });
+  } catch {
+    setState({ libLoading: false });
+  }
+}
+
+async function deleteSong(id) {
+  await apiDelete(id);
+  await loadLibrary();
+}
+
+// ─── Waveform ─────────────────────────────────────────────────────────────────
+function waveformHTML(data) {
+  if (!data || data.length === 0) return '';
+  const n = 80;
+  const step = Math.floor(data.length / n);
+  const bars = [];
+  for (let i = 0; i < n; i++) {
+    const chunk = data.slice(i * step, (i + 1) * step);
+    const peak = Math.max(...chunk.map(Math.abs));
+    const h = Math.max(4, Math.round(peak * 70));
+    const delay = (i * 15) % 1500;
+    bars.push(`<div class="waveform-bar" style="height:${h}px;animation-delay:${delay}ms"></div>`);
+  }
+  return `<div class="waveform-container">${bars.join('')}</div>`;
+}
+
+// ─── Dropzone ─────────────────────────────────────────────────────────────────
+function dropzoneHTML(id, file) {
+  if (file) {
+    const size = (file.size / 1024).toFixed(1);
+    return `
+      <div class="file-selected">
+        <div class="file-icon">🎵</div>
+        <div class="file-info">
+          <div class="file-name">${file.name}</div>
+          <div class="file-size">${size} KB</div>
+        </div>
+        <button class="file-remove" onclick="clearFile('${id}')">✕</button>
+      </div>`;
+  }
+  return `
+    <div class="dropzone" id="dz-${id}"
+      ondragover="event.preventDefault();this.classList.add('dragging')"
+      ondragleave="this.classList.remove('dragging')"
+      ondrop="handleDrop(event,'${id}')"
+      onclick="document.getElementById('fi-${id}').click()">
+      <div class="drop-icon">📂</div>
+      <div class="drop-title">Drop audio file here</div>
+      <div class="drop-sub">or click to browse · WAV / MP3</div>
+    </div>
+    <input type="file" id="fi-${id}" accept=".wav,.mp3" style="display:none"
+      onchange="handleFile(event,'${id}')">`;
+}
+
+function handleDrop(e, id) {
+  e.preventDefault();
+  document.getElementById(`dz-${id}`)?.classList.remove('dragging');
+  const file = e.dataTransfer.files[0];
+  if (file) setFile(id, file);
+}
+
+function handleFile(e, id) {
+  const file = e.target.files[0];
+  if (file) setFile(id, file);
+}
+
+function setFile(id, file) {
+  if (id === 'identify') setState({ idFile: file, idResult: null, idError: null });
+  else setState({ indexFile: file });
+}
+
+function clearFile(id) {
+  if (id === 'identify') setState({ idFile: null, idResult: null });
+  else setState({ indexFile: null });
+}
+
+// ─── Render helpers ───────────────────────────────────────────────────────────
+function matchListHTML(matches) {
+  if (!matches || matches.length === 0) return '';
+  const max = matches[0].confidence;
+  return matches.map((m, i) => `
+    <div class="match-item">
+      <div class="match-rank">#${i + 1}</div>
+      <div class="match-info">
+        <div class="match-name">${m.title}</div>
+        <div class="match-meta">${m.artist} · score ${m.score}</div>
+      </div>
+      <div class="match-bar-wrap">
+        <div class="match-bar-bg">
+          <div class="match-bar-fill" style="width:${Math.round((m.confidence / max) * 100)}%"></div>
+        </div>
+      </div>
+      <div class="match-score">${m.confidence.toFixed(1)}%</div>
+    </div>`).join('');
+}
+
+// ─── Tab content ──────────────────────────────────────────────────────────────
+function identifyTab() {
+  const { idFile, idLoading, idResult, idError } = state;
+  let resultHTML = '';
+
+  if (idResult) {
+    const { top_match, matches, query_info, spectrogram_png, fft_png, waveform } = idResult;
+
+    if (top_match) {
+      resultHTML = `
+        <div class="result-hero">
+          <div class="result-icon">🎶</div>
+          <div>
+            <div class="result-title">${top_match.title}</div>
+            <div class="result-artist">${top_match.artist}</div>
+          </div>
+          <div class="confidence-badge">
+            <div class="confidence-num">${top_match.confidence.toFixed(0)}%</div>
+            <div class="confidence-label">Confidence</div>
+          </div>
+        </div>`;
+    } else {
+      resultHTML = `
+        <div class="no-match">
+          <div class="no-match-icon">🔍</div>
+          <p>No matching song found.<br>Add more songs to the library first.</p>
+        </div>`;
+    }
+
+    resultHTML += `
+      <div class="card">
+        <div class="card-title">All Candidates</div>
+        ${matchListHTML(matches)}
+      </div>`;
+
+    resultHTML += `
+      <div class="card">
+        <div class="card-title">Query Stats</div>
+        <div class="stats-row">
+          <div class="stat-chip"><div class="stat-num">${query_info.num_peaks}</div><div class="stat-label">Peaks</div></div>
+          <div class="stat-chip"><div class="stat-num">${query_info.num_hashes}</div><div class="stat-label">Hashes</div></div>
+          <div class="stat-chip"><div class="stat-num">${query_info.duration.toFixed(1)}s</div><div class="stat-label">Duration</div></div>
+          <div class="stat-chip"><div class="stat-num">${matches.length}</div><div class="stat-label">Candidates</div></div>
+        </div>
+        ${waveform ? waveformHTML(waveform) : ''}
+      </div>`;
+
+    if (spectrogram_png || fft_png) {
+      resultHTML += `<div class="viz-grid">`;
+      if (spectrogram_png) resultHTML += `
+        <div class="viz-panel">
+          <div class="viz-label">📊 Spectrogram + Peak Map</div>
+          <img src="data:image/png;base64,${spectrogram_png}" alt="Spectrogram"/>
+        </div>`;
+      if (fft_png) resultHTML += `
+        <div class="viz-panel">
+          <div class="viz-label">〰️ FFT Frequency Snapshot</div>
+          <img src="data:image/png;base64,${fft_png}" alt="FFT"/>
+        </div>`;
+      resultHTML += `</div>`;
+    }
+  }
+
+  return `
+    <div class="card">
+      <div class="card-title">Upload Audio Clip</div>
+      ${dropzoneHTML('identify', idFile)}
+      ${idError ? `<div class="error-box">⚠️ ${idError}</div>` : ''}
+      ${idLoading ? `<div class="loading-bar"><div class="loading-bar-fill"></div></div>` : ''}
+      <button class="btn btn-primary" onclick="doIdentify()"
+        ${!idFile || idLoading ? 'disabled' : ''}>
+        ${idLoading ? '<div class="spinner"></div> Analysing...' : '🔍 Identify Song'}
+      </button>
+    </div>
+    ${resultHTML}`;
+}
+
+function indexTab() {
+  const { indexFile, indexTitle, indexArtist, indexLoading, indexResult, indexError } = state;
+
+  let resultHTML = '';
+  if (indexResult) {
+    resultHTML = `
+      <div class="result-hero">
+        <div class="result-icon">✅</div>
+        <div>
+          <div class="result-title">${indexResult.title}</div>
+          <div class="result-artist">${indexResult.artist}</div>
+        </div>
+        <div class="confidence-badge">
+          <div class="confidence-num">${indexResult.num_hashes}</div>
+          <div class="confidence-label">Hashes</div>
+        </div>
+      </div>`;
+  }
+
+  return `
+    <div class="card">
+      <div class="card-title">Add Song to Database</div>
+      ${dropzoneHTML('index', indexFile)}
+      <div class="form-row">
+        <div class="input-group">
+          <label>Song Title *</label>
+          <input type="text" placeholder="e.g. Blinding Lights"
+            value="${indexTitle}"
+            oninput="setState({indexTitle:this.value})"/>
+        </div>
+        <div class="input-group">
+          <label>Artist</label>
+          <input type="text" placeholder="e.g. The Weeknd"
+            value="${indexArtist}"
+            oninput="setState({indexArtist:this.value})"/>
+        </div>
+      </div>
+      ${indexError ? `<div class="error-box">⚠️ ${indexError}</div>` : ''}
+      ${indexLoading ? `<div class="loading-bar"><div class="loading-bar-fill"></div></div>` : ''}
+      <button class="btn btn-primary" onclick="doIndex()"
+        ${!indexFile || !indexTitle || indexLoading ? 'disabled' : ''}>
+        ${indexLoading ? '<div class="spinner"></div> Processing...' : '📀 Index Song'}
+      </button>
+    </div>
+    ${resultHTML}`;
+}
+
+function libraryTab() {
+  const { songs, stats, libLoading } = state;
+
+  const songsHTML = songs.length === 0
+    ? `<div class="empty"><div class="empty-icon">📂</div>No songs indexed yet.<br>Add some in the "Index" tab!</div>`
+    : songs.map((s, i) => `
+        <div class="song-row">
+          <div class="song-num">${i + 1}</div>
+          <div class="song-info">
+            <div class="song-title">${s.title}</div>
+            <div class="song-meta">${s.artist} · ${s.duration?.toFixed(1)}s · ID: <span class="pill">${s.id}</span></div>
+          </div>
+          <div class="song-hashes">${s.num_hashes} hashes</div>
+          <button class="btn-danger" onclick="deleteSong('${s.id}')" title="Remove">🗑</button>
+        </div>`).join('');
+
+  return `
+    <div class="card">
+      <div class="card-title">Database Overview</div>
+      <div class="stats-row">
+        <div class="stat-chip"><div class="stat-num">${stats.total_songs}</div><div class="stat-label">Songs</div></div>
+        <div class="stat-chip"><div class="stat-num">${stats.total_hashes?.toLocaleString()}</div><div class="stat-label">Total Hashes</div></div>
+        <div class="stat-chip"><div class="stat-num">${stats.unique_hash_keys?.toLocaleString()}</div><div class="stat-label">Unique Keys</div></div>
+      </div>
+      <button class="btn btn-sm" onclick="loadLibrary()" style="margin-bottom:16px">
+        🔄 Refresh
+      </button>
+      ${libLoading ? '<div class="loading-bar"><div class="loading-bar-fill"></div></div>' : songsHTML}
+    </div>`;
+}
+
+function learnTab() {
+  return `
+    <div class="learn-section">
+      <div class="learn-block">
+        <h3>🌊 What is a Fourier Transform?</h3>
+        <p>Any periodic signal — music, speech, vibrations — can be decomposed into a sum of sine waves at different frequencies. The Fourier Transform does exactly this: it takes a time-domain signal and returns a frequency-domain representation showing how much of each frequency is present.</p>
+        <div class="math-box">
+          F(ω) = ∫₋∞^∞ f(t) · e^(-iωt) dt
+          <br/>
+          ↑ Continuous Fourier Transform: maps time → frequency
+        </div>
+      </div>
+
+      <div class="learn-block">
+        <h3>🔢 DFT vs FFT — What's the difference?</h3>
+        <p>The <strong>Discrete Fourier Transform (DFT)</strong> is the digital version: instead of an integral over continuous time, it sums over N discrete samples. It runs in <span class="pill">O(N²)</span> time.</p>
+        <div class="math-box">
+          X[k] = Σ_{n=0}^{N-1} x[n] · e^(-j2πkn/N)
+          <br/>
+          ↑ DFT: k = frequency bin, n = sample index
+        </div>
+        <p style="margin-top:12px">The <strong>Fast Fourier Transform (FFT)</strong> is an algorithm (Cooley-Tukey, 1965) that computes the exact same DFT in <span class="pill">O(N log N)</span> by splitting the transform into smaller DFTs recursively. For N = 4096: DFT needs 16M operations; FFT needs only ~49K — that's 300× faster.</p>
+      </div>
+
+      <div class="learn-block">
+        <h3>📊 Spectrograms & STFT</h3>
+        <p>A song changes over time, so a single FFT of the whole track isn't useful. Instead, we use the <strong>Short-Time Fourier Transform (STFT)</strong>: slide a window across the audio, apply FFT to each window, and stack the results into a 2D heatmap called a spectrogram. The X axis is time, Y axis is frequency, and colour/brightness is amplitude.</p>
+        <div class="math-box">
+          STFT(x)[m, k] = Σ_n x[n] · w[n - m·H] · e^(-j2πkn/N)
+          <br/>
+          w = Hann window  ·  H = hop length  ·  m = frame index
+        </div>
+      </div>
+
+      <div class="learn-block">
+        <h3>🎯 How Shazam Works (Simplified)</h3>
+        <p><strong>Step 1 — Constellation Map:</strong> Find local peak frequencies in the spectrogram. These are the "loudest" frequencies in each time-frequency neighbourhood, and they're stable even in noisy environments.</p>
+        <p style="margin-top:8px"><strong>Step 2 — Combinatorial Hashing:</strong> For each peak (anchor), pair it with nearby peaks (targets) and hash <span class="pill">hash(f₁, f₂, Δt)</span>. The time delta makes the hash robust to where in a song you start recording.</p>
+        <p style="margin-top:8px"><strong>Step 3 — Time Alignment Matching:</strong> For a clip, look up every hash in the database. A correct match will produce many hashes that all align at the same time offset — this is the key insight! False matches scatter randomly.</p>
+        <div class="math-box">
+          score(song) = max over all Δt of: |{hashes that match at offset Δt}|
+        </div>
+      </div>
+
+      <div class="learn-block">
+        <h3>🎵 Why FreqFind Works</h3>
+        <p>FreqFind implements all four steps from scratch using NumPy/SciPy FFT functions. The fingerprint database stores hashes from full songs; identification uses a short clip and searches for time-aligned hash clusters. This is essentially the same algorithm described in Wang (2003) — Shazam's original paper — just simplified for education.</p>
+      </div>
+    </div>`;
+}
+
+// ─── Main Render ──────────────────────────────────────────────────────────────
+function render() {
+  const { tab } = state;
+
+  const tabs = [
+    { id: 'identify', label: '🔍 Identify' },
+    { id: 'index',    label: '📀 Index'    },
+    { id: 'library',  label: '📚 Library'  },
+    { id: 'learn',    label: '📐 Learn'    },
+  ];
+
+  const tabsHTML = tabs.map(t =>
+    `<button class="tab ${tab === t.id ? 'active' : ''}" onclick="switchTab('${t.id}')">${t.label}</button>`
+  ).join('');
+
+  let content = '';
+  if (tab === 'identify') content = identifyTab();
+  else if (tab === 'index') content = indexTab();
+  else if (tab === 'library') content = libraryTab();
+  else content = learnTab();
+
+  document.getElementById('root').innerHTML = `
+    <div class="app">
+      <header>
+        <div class="logo">
+          <span class="logo-mark">FFT</span>
+        </div>
+        <h1>FreqFind</h1>
+        <div class="tagline">// Shazam reimagined · Fourier Transform music identification</div>
+      </header>
+      <div class="tabs">${tabsHTML}</div>
+      ${content}
+    </div>`;
+}
+
+function switchTab(t) {
+  setState({ tab: t });
+  if (t === 'library') loadLibrary();
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+render();
+loadLibrary();
+</script>
+</body>
+</html>

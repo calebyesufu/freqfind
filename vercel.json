@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "name": "freqfind",
+  "buildCommand": "node scripts/write-config.js",
+  "outputDirectory": ".",
+  "installCommand": "",
+  "rewrites": [
+    { "source": "/config.js", "destination": "/config.js" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" }
+      ]
+    }
+  ]
+}

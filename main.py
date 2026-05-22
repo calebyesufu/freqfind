@@ -15,6 +15,8 @@ import tempfile
 import base64
 import io
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, File, UploadFile, Form, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -27,10 +29,30 @@ import matplotlib.colors as mcolors
 from fingerprint import fingerprint_audio, load_audio, compute_spectrogram, find_peaks
 from db import add_song, match_song, list_songs, delete_song, get_db_stats
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    import subprocess
+    root = os.path.dirname(os.path.abspath(__file__))
+    seed_script = os.path.join(root, "scripts", "seed_if_empty.py")
+    if os.path.isfile(seed_script):
+        try:
+            subprocess.run(
+                [sys.executable, seed_script],
+                cwd=root,
+                check=False,
+                timeout=600,
+            )
+        except Exception as e:
+            print(f"Startup seed skipped: {e}")
+    yield
+
+
 app = FastAPI(
     title="FreqFind",
     description="FFT-based music identification API",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(

@@ -697,10 +697,15 @@
 </head>
 <body>
 <div id="root"></div>
-
+<script src="config.js"></script>
 <script>
 // ─── Config ───────────────────────────────────────────────────────────────────
-const API = 'http://localhost:8000';
+const API = (() => {
+  if (window.FREQFIND_API) return window.FREQFIND_API;
+  const h = location.hostname;
+  if (h === 'localhost' || h === '127.0.0.1') return 'http://localhost:8000';
+  return 'https://freqfind-api.onrender.com';
+})();
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let state = {

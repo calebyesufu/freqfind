@@ -42,7 +42,10 @@ from datetime import datetime
 import uuid
 
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "fingerprints.json")
+DB_PATH = os.environ.get(
+    "FINGERPRINTS_DB",
+    os.path.join(os.path.dirname(__file__), "fingerprints.json"),
+)
 
 
 def _load_db() -> dict:

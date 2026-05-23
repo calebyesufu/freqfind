@@ -1,3 +1,2 @@
-// Generated at build
-window.FREQFIND_API = '/api';
+// Generated at Vercel build — backend URL (CORS enabled on Render)
 window.FREQFIND_RENDER_URL = 'https://freqfind-api.onrender.com';

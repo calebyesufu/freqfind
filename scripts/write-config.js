@@ -9,25 +9,21 @@ const api = (
 
 const root = path.join(__dirname, '..');
 
-// Frontend: use /api on Vercel (proxied to Render)
 fs.writeFileSync(
   path.join(root, 'config.js'),
-  `// Generated at build\nwindow.FREQFIND_API = '/api';\nwindow.FREQFIND_RENDER_URL = '${api.replace(/'/g, "\\'")}';\n`,
+  `// Generated at Vercel build — backend URL (CORS enabled on Render)\nwindow.FREQFIND_RENDER_URL = '${api.replace(/'/g, "\\'")}';\n`,
   'utf8'
 );
 
-// Vercel: proxy /api/* to Render (must be before SPA fallback)
+// Static site only — no /api proxy (unreliable on some Vercel setups)
 const vercel = {
   version: 2,
   name: 'freqfind',
   buildCommand: 'node scripts/write-config.js',
   outputDirectory: '.',
   installCommand: '',
-  rewrites: [
-    { source: '/api/:path*', destination: `${api}/:path*` },
-    { source: '/(.*)', destination: '/index.html' },
-  ],
+  rewrites: [{ source: '/(.*)', destination: '/index.html' }],
 };
 
 fs.writeFileSync(path.join(root, 'vercel.json'), JSON.stringify(vercel, null, 2) + '\n', 'utf8');
-console.log('Wrote config.js (API=/api) and vercel.json proxy ->', api);
+console.log('config.js -> FREQFIND_RENDER_URL =', api);

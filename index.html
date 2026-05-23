@@ -703,10 +703,8 @@
 const API = (() => {
   const h = location.hostname;
   if (h === 'localhost' || h === '127.0.0.1') return 'http://localhost:8000';
-  if (window.FREQFIND_API) return String(window.FREQFIND_API).replace(/\/$/, '');
-  // Vercel: /api is proxied to Render in vercel.json
-  if (h.includes('vercel.app') || h.endsWith('.vercel.app')) return '/api';
-  return 'https://freqfind-api.onrender.com';
+  const url = window.FREQFIND_RENDER_URL || 'https://freqfind-api.onrender.com';
+  return String(url).replace(/\/$/, '');
 })();
 
 async function parseApiError(res) {

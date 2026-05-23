@@ -6,10 +6,6 @@
   "installCommand": "",
   "rewrites": [
     {
-      "source": "/api/:path*",
-      "destination": "https://freqfind-api.onrender.com/:path*"
-    },
-    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

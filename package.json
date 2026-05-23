@@ -1,0 +1,5 @@
+{
+  "name": "freqfind",
+  "private": true,
+  "description": "Static frontend build for Vercel (backend runs on Render)"
+}

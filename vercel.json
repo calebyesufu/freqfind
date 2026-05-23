@@ -1,13 +1,8 @@
 {
   "version": 2,
   "name": "freqfind",
+  "framework": null,
   "buildCommand": "node scripts/write-config.js",
-  "outputDirectory": ".",
-  "installCommand": "",
-  "rewrites": [
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
-  ]
+  "outputDirectory": "public",
+  "installCommand": ""
 }

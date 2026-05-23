@@ -1,0 +1,14 @@
+# Backend — deployed on Render only (never run Python on Vercel)
+main.py
+fingerprint.py
+db.py
+generate_samples.py
+index_samples.py
+requirements.txt
+render.yaml
+fingerprints.json
+sample_songs/
+__pycache__/
+*.pyc
+*.wav
+push_to_github.sh

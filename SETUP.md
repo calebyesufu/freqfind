@@ -64,9 +64,12 @@ git push origin main
 
 1. Open: https://vercel.com/new  
 2. **Import** `calebyesufu/freqfind` from GitHub.  
-3. Framework Preset: **Other** (leave as detected from `vercel.json`).  
+3. Framework Preset: **Other** (must use `vercel.json` — **not** FastAPI/Python).  
 4. **Do not** change Root Directory (leave `.`).  
-5. Click **Deploy** once (may fail until env var is set — that’s OK).
+5. Output Directory must be **`public`** (set in `vercel.json` automatically).  
+6. Click **Deploy**.
+
+> **If you see `{"detail":"Not Found"}` on the homepage:** Vercel was running Python instead of the website. Latest code fixes this by deploying only the `public/` folder.
 
 ### 3b — Environment variable (critical)
 
@@ -90,10 +93,11 @@ git push origin main
 
 ### 3d — Verify frontend
 
-1. Open your Vercel URL in the browser.  
-2. Press **F12** → **Console** — there should be no red CORS errors.  
-3. Open **Library** tab — you should see **5 songs**.  
-4. If you see a red **Backend** banner, Render URL or redeploy is wrong — repeat Step 2 and 3b–3c.
+1. Open: **https://freqfind.vercel.app** (or your main domain from Vercel → Domains).  
+2. You must see the **FreqFind** purple UI — **not** plain text `{"detail":"Not Found"}`.  
+3. Press **F12** → **Console** — no red CORS errors.  
+4. **Library** tab → **5 songs**.  
+5. If you see a red **Backend** banner, fix Render URL in Step 3b and redeploy.
 
 ---
 

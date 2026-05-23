@@ -1,5 +1,12 @@
+/**
+ * Vercel build: copy static frontend into public/ only.
+ * Prevents Vercel from treating main.py + requirements.txt as a Python app.
+ */
 const fs = require('fs');
 const path = require('path');
+
+const root = path.join(__dirname, '..');
+const publicDir = path.join(root, 'public');
 
 const api = (
   process.env.RENDER_API_URL ||
@@ -7,23 +14,23 @@ const api = (
   'https://freqfind-api.onrender.com'
 ).replace(/\/$/, '');
 
-const root = path.join(__dirname, '..');
+fs.mkdirSync(publicDir, { recursive: true });
+
+fs.copyFileSync(path.join(root, 'index.html'), path.join(publicDir, 'index.html'));
 
 fs.writeFileSync(
-  path.join(root, 'config.js'),
-  `// Generated at Vercel build — backend URL (CORS enabled on Render)\nwindow.FREQFIND_RENDER_URL = '${api.replace(/'/g, "\\'")}';\n`,
+  path.join(publicDir, 'config.js'),
+  `window.FREQFIND_RENDER_URL = '${api.replace(/'/g, "\\'")}';\n`,
   'utf8'
 );
 
-// Static site only — no /api proxy (unreliable on some Vercel setups)
-const vercel = {
-  version: 2,
-  name: 'freqfind',
-  buildCommand: 'node scripts/write-config.js',
-  outputDirectory: '.',
-  installCommand: '',
-  rewrites: [{ source: '/(.*)', destination: '/index.html' }],
-};
+// Root copy for local dev (python -m http.server in project root)
+fs.writeFileSync(
+  path.join(root, 'config.js'),
+  `window.FREQFIND_RENDER_URL = '${api.replace(/'/g, "\\'")}';\n`,
+  'utf8'
+);
 
-fs.writeFileSync(path.join(root, 'vercel.json'), JSON.stringify(vercel, null, 2) + '\n', 'utf8');
-console.log('config.js -> FREQFIND_RENDER_URL =', api);
+console.log('Vercel static build OK -> public/');
+console.log('  index.html');
+console.log('  config.js  ->', api);
